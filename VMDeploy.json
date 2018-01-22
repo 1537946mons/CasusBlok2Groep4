@@ -1,0 +1,138 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "VMname": 
+        { 
+            "type": "string"
+        },
+        "Subnetname": 
+        {
+            "type": "string" 
+        },
+        "adminUsername": 
+        { 
+            "type": "string", 
+            "defaultValue": "Zuyd"
+        },
+        "adminPassword": 
+        { 
+            "type": "securestring" 
+        },
+        "IPaddress": 
+        { 
+            "type": "string" 
+        },
+        "VMsize": 
+        { 
+            "type": "string", 
+            "allowedValues": [
+                "D1_V2",
+                "D2_V2"
+            ],
+            "defaultValue": "D1_V2"
+        },
+        "OSoffer":
+        {
+            "type": "string",
+            "allowedValues": [
+                "WindowsServer",
+                "UbuntuServer"
+            ],
+            "defaultValue": "WindowsServer"
+        },
+        "OSversion":
+        {
+            "type": "string",
+            "allowedValues": [
+                "2016-Datacenter",
+                "16.04-LTS"
+            ],
+            "defaultValue": "2016-Datacenter"
+        },
+        "OSpublisher":
+        {
+            "type": "string",
+            "allowedValues": [
+                "MicrosoftWindowsServer",
+                "Canonical"
+            ],
+            "defaultValue": "MicrosoftWindowsServer"
+        }
+    },
+    "variables": {
+        "vnetID": "[resourceId('Microsoft.Network/virtualNetworks','VNET-CASUS-04-BLK2')]", 
+        "subnetRef": "[concat(variables('vnetID'),'/subnets/',parameters('Subnetname'))]",
+        "VMnameFull": "[toUpper(concat('ZUY-VM-',parameters('VMname')))]",
+        "NICnameFull": "[toUpper(concat('ZUY-NIC-',parameters('VMname')))]"
+    },
+    "resources": [
+      {
+        "apiVersion": "2016-03-30",
+        "type": "Microsoft.Network/networkInterfaces",
+        "name": "[variables('NICnameFull')]",
+        "location": "[resourceGroup().location]",
+        "properties": {
+          "ipConfigurations": [
+            {
+              "name": "[variables('NICnameFull')]",
+              "properties": {
+                "privateIPAddress": "[parameters('IPaddress')]",
+                "privateIPAllocationMethod": "Static",
+                "subnet": { "id": "[variables('subnetRef')]" }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "apiVersion": "2016-04-30-preview",
+        "type": "Microsoft.Compute/virtualMachines",
+        "name": "[variables('VMnameFull')]",
+        "location": "[resourceGroup().location]",
+        "dependsOn": [
+          "[resourceId('Microsoft.Network/networkInterfaces/', variables('NICnameFull'))]"
+        ],
+        "properties": {
+          "hardwareProfile": { "vmSize": "[concat('Standard_',parameters('VMsize'))]" },
+          "osProfile": {
+            "computerName": "[variables('VMnameFull')]",
+            "adminUsername": "[parameters('adminUsername')]",
+            "adminPassword": "[parameters('adminPassword')]"
+          },
+          "storageProfile": {
+            "imageReference": {
+              "publisher": "[parameters('OSpublisher')]",
+              "offer": "[parameters('OSoffer')]",
+              "sku": "[parameters('OSversion')]",
+              "version": "latest"
+            },
+            "osDisk": {
+              "name": "[concat(variables('VMnameFull'),'-osDisk')]",
+              "caching": "ReadWrite",
+              "createOption": "FromImage"
+            },
+            "dataDisks":[
+                {
+                    "lun": 0,
+                    "name": "[concat(variables('VMnameFull'),'-dataDisk')]",
+                    "createOption": "Empty",
+                    "diskSizeGB": 128,
+                    "caching": "None",
+                    "managedDisk": {
+                        "storageAccountType": "Standard_LRS"
+                    }
+                }
+            ]
+          },
+          "networkProfile": {
+            "networkInterfaces": [
+              {
+                "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('NICnameFull'))]"
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
